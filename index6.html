@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrales Impropias</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.6.4/math.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: #000000; 
+            color: #ffbb00; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px; 
+        }
+        .calculator { 
+            border: 1px solid #ccc; 
+            padding: 20px; 
+            border-radius: 10px; 
+            width: 100%; 
+            max-width: 500px; 
+            background: #fff; 
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1); 
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #ffbb00;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:hover {
+            background-color: #ffae00;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .hint {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 2px;
+        }
+        .steps {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Integrales Impropias</h1>
+    <div class="calculator">
+        <div class="input-group">
+            <label for="function">Función:</label>
+            <input type="text" id="function" placeholder="Ej: 1/x^2">
+            <div class="hint">Ejemplos válidos: 1/x^2, exp(-x), 1/(x+1)</div>
+        </div>
+
+        <div class="input-group">
+            <label for="lowerLimit">Límite inferior:</label>
+            <input type="text" id="lowerLimit" placeholder="Número o -Infinity">
+            <div class="hint">Ejemplos: 1, -1, -Infinity</div>
+        </div>
+
+        <div class="input-group">
+            <label for="upperLimit">Límite superior:</label>
+            <input type="text" id="upperLimit" placeholder="Número o Infinity">
+            <div class="hint">Ejemplos: 2, Infinity</div>
+        </div>
+
+        <button onclick="calculate()">Calcular</button>
+        <div id="steps" class="steps"></div>
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        function evaluateAtPoint(func, point) {
+            try {
+                if (point === Infinity || point === -Infinity) {
+                    const sign = point === Infinity ? 1 : -1;
+                    const x = sign * 1e6;
+                    return math.evaluate(func, { x: x });
+                }
+                return math.evaluate(func, { x: point });
+            } catch (e) {
+                throw new Error(`No se puede evaluar la función en x = ${point}`);
+            }
+        }
+
+        function calculate() {
+            const resultDiv = document.getElementById('result');
+            const stepsDiv = document.getElementById('steps');
+            let steps = [];
+
+            try {
+                // Obtener y validar la función
+                const func = document.getElementById('function').value;
+                if (!func) throw new Error("Por favor ingrese una función");
+                steps.push(`1. Función ingresada: ${func}`);
+
+                // Obtener y validar límites
+                let lower = document.getElementById('lowerLimit').value.trim();
+                let upper = document.getElementById('upperLimit').value.trim();
+
+                // Convertir límites a números o infinito
+                lower = lower.toLowerCase() === 'infinity' ? Infinity :
+                        lower.toLowerCase() === '-infinity' ? -Infinity :
+                        parseFloat(lower);
+                upper = upper.toLowerCase() === 'infinity' ? Infinity :
+                        upper.toLowerCase() === '-infinity' ? -Infinity :
+                        parseFloat(upper);
+
+                if (isNaN(lower) && lower !== Infinity && lower !== -Infinity) 
+                    throw new Error("Límite inferior inválido");
+                if (isNaN(upper) && upper !== Infinity && upper !== -Infinity)
+                    throw new Error("Límite superior inválido");
+
+                steps.push(`2. Límites de integración: [${lower}, ${upper}]`);
+
+                // Evaluar en puntos críticos
+                let evalPoints = [];
+                if (lower !== -Infinity) evalPoints.push(lower);
+                if (upper !== Infinity) evalPoints.push(upper);
+
+                steps.push('3. Evaluando función en puntos críticos...');
+                for (let point of evalPoints) {
+                    try {
+                        const value = evaluateAtPoint(func, point);
+                        steps.push(`   En x = ${point}: ${value}`);
+                    } catch (e) {
+                        steps.push(`   Advertencia: No se puede evaluar en x = ${point}`);
+                    }
+                }
+
+                // Calcular la integral usando diferentes métodos según los límites
+                let result;
+                const epsilon = 1e-10;
+                const M = 1e6;
+
+                // Ajustar límites para el cálculo
+                let evalLower = lower === -Infinity ? -M : lower;
+                let evalUpper = upper === Infinity ? M : upper;
+
+                steps.push('4. Calculando la integral...');
+                try {
+                    // Intentar calcular primero la primitiva
+                    const primitive = math.derivative(func, 'x');
+                    steps.push(`   Primitiva encontrada: ${primitive}`);
+                    
+                    // Calcular la integral definida
+                    result = math.evaluate(`integrate(${func}, x, ${evalLower}, ${evalUpper})`);
+                    steps.push(`   Valor calculado: ${result}`);
+
+                    if (math.abs(result) === Infinity || isNaN(result)) {
+                        resultDiv.innerHTML = "La integral impropia diverge";
+                    } else {
+                        resultDiv.innerHTML = `La integral impropia converge a: ${math.format(result, {precision: 6})}`;
+                    }
+                } catch (e) {
+                    steps.push('   Error en el cálculo directo, intentando método numérico...');
+                    
+                    // Intentar método numérico
+                    try {
+                        const samples = 1000;
+                        const dx = (evalUpper - evalLower) / samples;
+                        result = 0;
+                        
+                        for (let i = 0; i < samples; i++) {
+                            const x = evalLower + i * dx;
+                            result += evaluateAtPoint(func, x) * dx;
+                        }
+                        
+                        steps.push(`   Aproximación numérica: ${result}`);
+                        resultDiv.innerHTML = `Aproximación de la integral: ${math.format(result, {precision: 6})}`;
+                    } catch (e2) {
+                        throw new Error("No se puede calcular la integral con los métodos disponibles");
+                    }
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+
+            // Mostrar pasos
+            stepsDiv.innerHTML = steps.join('<br>');
+        }
+    </script>
+</body>
+</html>
